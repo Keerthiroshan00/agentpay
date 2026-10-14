@@ -34,7 +34,7 @@ function App() {
   const [task, setTask] = useState('')
   const [budget, setBudget] = useState('0.001')
   const [running, setRunning] = useState(false)
-  const [showTaskResult, setShowTaskResult] = useState(false)
+  const [taskResult, setTaskResult] = useState<{ status: string; result: string } | null>(null)
   const [search, setSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [notice, setNotice] = useState('')
@@ -44,12 +44,14 @@ function App() {
   const [paymentCap, setPaymentCap] = useState('0.001')
   const [mobileNav, setMobileNav] = useState(false)
   const [apiConnected, setApiConnected] = useState(false)
+  const [groqConfigured, setGroqConfigured] = useState(false)
 
   useEffect(() => {
     const api = import.meta.env.VITE_API_URL || '/api'
     fetch(`${api}/health`).then(r => { if (!r.ok) throw new Error('API unavailable'); return r.json() })
-      .then(() => {
+      .then(data => {
         setApiConnected(true)
+        setGroqConfigured(Boolean(data.groqConfigured))
         fetch(`${api}/policy`).then(r => r.ok ? r.json() : null).then(data => {
           if (data) { setPaymentCap(String(data.maxPaymentUsdc)); setDailyLimit(String(data.dailyBudgetUsdc)) }
         }).catch(() => undefined)
@@ -68,7 +70,7 @@ function App() {
     const numericBudget = Number(budget)
     if (!Number.isFinite(numericBudget) || numericBudget <= 0) { setNotice('Enter a valid positive task budget.'); return }
     setRunning(true)
-    setShowTaskResult(false)
+    setTaskResult(null)
     setNotice('')
     try {
       const api = import.meta.env.VITE_API_URL || '/api'
@@ -78,10 +80,11 @@ function App() {
       })
       const data = await response.json()
       if (!response.ok) {
+        if (data.task?.result) setTaskResult({ status: data.task.status, result: data.task.result })
         setNotice(data.reason || data.error || 'The backend rejected this task.')
         return
       }
-      setShowTaskResult(true)
+      if (data.task?.result) setTaskResult({ status: data.task.status, result: data.task.result })
       setNotice(data.note || data.task?.result || 'Task submitted to AgentPay backend.')
       if (data.task?.status === 'Completed' && data.task?.result) setTask(`${task}`)
     } catch {
@@ -185,7 +188,7 @@ function App() {
             <div className="panel task-panel">
               <div className="panel-heading">
                 <div><div className="section-kicker"><Sparkles size={14}/> AI WORKSPACE</div><h2>Run a new task</h2><p>Tell your agent what you need. It handles the rest.</p></div>
-                <span className="ai-chip"><span className="live-dot"/> Groq AI</span>
+                <span className="ai-chip"><span className="live-dot"/> {groqConfigured ? 'Groq AI ready' : 'Groq API not configured'}</span>
               </div>
               <label className="field-label" htmlFor="task-input">What should your agent do?</label>
               <textarea id="task-input" value={task} onChange={e => setTask(e.target.value)} placeholder="e.g. Research the latest developments in five Web3 startups and summarize the key findings..." rows={4}/>
@@ -198,7 +201,7 @@ function App() {
                 <div className="budget-control"><label className="field-label" htmlFor="task-budget">MAX TASK BUDGET</label><div className="budget-input"><CircleDollarSign size={16}/><input id="task-budget" value={budget} onChange={e => setBudget(e.target.value)} inputMode="decimal" aria-label="Maximum task budget"/><span>USDC</span><ChevronDown size={14}/></div></div>
                 <button className="run-button" disabled={running} onClick={runTask}>{running ? <><LoaderCircle className="spin" size={17}/> Planning task...</> : <><Send size={16}/> Run agent <span>↗</span></>}</button>
               </div>
-              {showTaskResult && <div className="result-preview"><CheckCircle2 size={17}/><div><strong>Task preview created</strong><span>Connect your backend to enable real AI execution and testnet payments.</span></div></div>}
+              {taskResult && <div className="result-preview"><CheckCircle2 size={17}/><div><strong>{taskResult.status === 'Completed' ? 'Task response' : 'Task failed'}</strong><span style={{ fontSize: 12, color: '#cdd3e5', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6 }}>{taskResult.result}</span></div></div>}
               <div className="task-footnote"><LockKeyhole size={13}/> Your task is checked against spending policies before any payment.</div>
             </div>
 

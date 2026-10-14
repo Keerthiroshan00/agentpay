@@ -6,6 +6,7 @@ A React + Vite + TypeScript dashboard with a Node.js + Express + TypeScript API,
 
 - Responsive AgentPay dashboard UI.
 - Express API: health, metrics, transactions, tasks, and spending-policy routes.
+- Groq-powered AI task responses, with the API key held by the backend.
 - Server-side budget enforcement before any x402 request: per-payment cap and daily budget.
 - Zod request validation, Helmet security headers, CORS allowlist, JSON body limit, and API rate limit.
 - x402 client using `@x402/fetch` + CDP-managed wallet with SDK-enforced per-payment cap, rolling cumulative cap, and Base Sepolia-only network allowlist.
@@ -34,6 +35,7 @@ A React + Vite + TypeScript dashboard with a Node.js + Express + TypeScript API,
    ```
 
 4. Copy `backend/.env.example` to `backend/.env` and edit values as needed.
+   Set `GROQ_API` to your Groq API key in `backend/.env`. AI task responses use `GROQ_MODEL` (default: `openai/gpt-oss-120b`); never put the key in a `VITE_*` variable or commit it.
 5. Start frontend and backend together:
 
    ```bash
@@ -53,7 +55,9 @@ A React + Vite + TypeScript dashboard with a Node.js + Express + TypeScript API,
 - `X402_PAID_API_URL` — optional URL of a real x402-protected API that the agent should request.
 - `MAX_PAYMENT_USDC` and `DAILY_BUDGET_USDC` — backend enforcement caps in USDC dollar units.
 
-A task is only sent to an external paid API after the backend validates the requested budget against the per-payment and daily caps. If the paid API URL or CDP credentials are missing, the task is stored as a preview and no payment is attempted.
+A task budget is checked against the backend policy before execution. When a paid API URL and CDP payer credentials are configured, the task uses the existing x402 path. Otherwise it uses Groq for a text response and makes no blockchain payment; if `GROQ_API` is missing, the backend returns a configuration error instead of pretending the task ran.
+
+When `X402_PAID_API_URL` and CDP payer credentials are not configured, tasks are answered by Groq without making a blockchain payment. Groq responses use the model's existing knowledge and cannot browse the web or perform external actions; requests for current information may therefore need a separate browsing/tool integration.
 
 ## API routes
 
